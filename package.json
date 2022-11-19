@@ -1,0 +1,67 @@
+{
+  "name": "dowi-stylelint",
+  "version": "0.0.1",
+  "description": "A custom rules stylelint plugin.",
+  "keywords": [
+    "stylelint-plugin",
+    "stylelint",
+    "css",
+    "scss",
+    "less",
+    "lint"
+  ],
+  "homepage": "github.com/18270219411/my-stylelint#readme",
+  "repository": "github.com/18270219411/my-stylelint",
+  "license": "MIT",
+  "author": "lunguizhang",
+  "main": "index.js",
+  "scripts": {
+    "preinstall": "npx only-allow pnpm",
+    "commit": "cz",
+    "prepare": "husky install",
+    "format": "prettier ./src --write --cache",
+    "version": "changeset version",
+    "publish": "changeset publish"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "*.{js,mjs}": "eslint --cache --fix",
+    "*.{js,json,md,mjs,ts}": "prettier --write"
+  },
+  "prettier": "@stylelint/prettier-config",
+  "eslintConfig": {
+    "extends": [
+      "stylelint"
+    ],
+    "root": true
+  },
+  "dependencies": {
+    "import-lazy": "^4.0.0",
+    "lodash": "^4.17.21",
+    "postcss-value-parser": "^4.2.0",
+    "stylelint-config-standard": "^29.0.0",
+    "tinycolor2": "^1.4.2"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.25.2",
+    "@commitlint/cli": "^17.2.0",
+    "@commitlint/config-conventional": "^17.2.0",
+    "@stylelint/prettier-config": "^2.0.0",
+    "@stylelint/remark-preset": "^4.0.0",
+    "eslint": "^8.28.0",
+    "eslint-config-stylelint": "^17.0.0",
+    "husky": "^8.0.2",
+    "only-allow": "^1.1.1",
+    "postcss-less": "^6.0.0",
+    "postcss-sass": "^0.5.0",
+    "postcss-scss": "^4.0.5",
+    "stylelint": "^14.5.1"
+  },
+  "peerDependencies": {
+    "stylelint": "^14.5.1"
+  }
+}
