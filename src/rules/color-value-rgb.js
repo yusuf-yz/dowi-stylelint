@@ -1,164 +1,151 @@
-"use strict";
+'use strict';
 
-const { ruleMessages, validateOptions, report } = require("stylelint").utils;
-const { isString, isArray } = require("lodash");
-const tinyColor = require("tinycolor2");
-const valueParser = require("postcss-value-parser");
+const { ruleMessages, validateOptions, report } = require('stylelint').utils;
+const { isString, isArray } = require('lodash');
+const tinyColor = require('tinycolor2');
+const valueParser = require('postcss-value-parser');
 
-const ruleName = "color-value-rgb";
+const ruleName = 'color-value-rgb';
 const messages = ruleMessages(ruleName, {
-  expected: (unfixed, fixed) => `Expected "${unfixed}" to be "${fixed}"`,
+	expected: (unfixed, fixed) => `Expected "${unfixed}" to be "${fixed}"`,
 });
 
 const ColorReg = /^(rgb)/;
-const SplitStr = "_&_";
+// div -> split word. eg: ,
+// function -> function attr. eg: rgb, linear-gradient
+// word -> attr value. eg: #000
+const ValidNodeType = new Set(['div', 'function', 'word']);
 // TODO: Support attributes to be improved
-const SimpleAttrs = new Set(["color", "background-color"]);
-const ComplexAttrs = new Set([
-  "background",
-  "border",
-  "text-shadow",
-  "box-shadow",
-]);
+const LintAttrs = new Set(['background', 'border', 'box-shadow', 'color', 'text-shadow']);
 
 const ruleFunction = (primary, secondaryOptions, context) => {
-  return (postcssRoot, postcssResult) => {
-    const validOptions = validateOptions(
-      postcssResult,
-      ruleName,
-      {
-        actual: primary,
-      },
-      {
-        optional: true,
-        actual: secondaryOptions,
-        possible: {
-          ignoreAttrs: [isString, isArray],
-          type: ["error", "warning"],
-        },
-      }
-    );
+	return (postcssRoot, postcssResult) => {
+		const validOptions = validateOptions(
+			postcssResult,
+			ruleName,
+			{
+				actual: primary,
+			},
+			{
+				optional: true,
+				actual: secondaryOptions,
+				possible: {
+					ignoreAttrs: [isString, isArray],
+					type: ['error', 'warning'],
+				},
+			},
+		);
 
-    if (!validOptions) {
-      return;
-    }
+		if (!validOptions) {
+			return;
+		}
 
-    const ignoreAttrs = secondaryOptions ? secondaryOptions.ignoreAttrs : "";
-    const severity = secondaryOptions ? secondaryOptions.type : "warning";
+		const ignoreAttrs = secondaryOptions ? secondaryOptions.ignoreAttrs : '';
+		const severity = secondaryOptions ? secondaryOptions.type : 'warning';
 
-    postcssRoot.walkDecls((decl) => {
-      const prop = decl.prop.toLowerCase();
-      const value = decl.value;
+		postcssRoot.walkDecls((decl) => {
+			const prop = decl.prop.toLowerCase();
+			const value = decl.value;
 
-      if (isString(ignoreAttrs) && prop === ignoreAttrs) {
-        return;
-      }
+			if (isString(ignoreAttrs) && prop === ignoreAttrs) {
+				return;
+			}
 
-      if (isArray(ignoreAttrs) && ignoreAttrs.some((attr) => attr === prop)) {
-        return;
-      }
+			if (isArray(ignoreAttrs) && ignoreAttrs.some((attr) => attr === prop)) {
+				return;
+			}
 
-      // Complex attr
-      // eg: border-color: #fff #fff; border: 1px solid; border: #fff #fff #fff;
-      if ([...ComplexAttrs].some((attr) => prop.startsWith(attr))) {
-        const { nodes = [] } = valueParser(getDeclarationValue(decl));
+			if ([...LintAttrs].some((attr) => prop.startsWith(attr))) {
+				const { nodes = [] } = valueParser(getDeclarationValue(decl));
 
-        if (!checkDeclHasFixColor(nodes)) {
-          return;
-        }
+				if (!checkDeclHasFixColor(nodes, value)) {
+					return;
+				}
 
-        const { originValue, fixedValue } = getFixedDeclValue(nodes);
+				const fixedValue = getFixedDeclValue(nodes, value);
 
-        if (context.fix) {
-          return (decl.value = fixedValue);
-        }
+				// console.log('fixed value is ', fixedValue);
 
-        return report({
-          message: messages.expected(
-            originValue.replace(/_&_/g, " "),
-            fixedValue
-          ),
-          node: decl,
-          word: value,
-          ruleName,
-          result: postcssResult,
-          severity,
-        });
-      }
+				if (context.fix) {
+					return (decl.value = fixedValue);
+				}
 
-      // Simple attr
-      // eg: color: ###;
-      if (!ColorReg.test(value) && SimpleAttrs.has(prop)) {
-        const fixedValue = tinyColor(value).toRgbString();
-
-        if (context.fix) {
-          return (decl.value = fixedValue);
-        }
-
-        report({
-          message: messages.expected(value, fixedValue),
-          node: decl,
-          word: value,
-          ruleName,
-          result: postcssResult,
-          severity,
-        });
-      }
-    });
-  };
+				return report({
+					message: messages.expected(value, fixedValue),
+					node: decl,
+					word: value,
+					ruleName,
+					result: postcssResult,
+					severity,
+				});
+			}
+		});
+	};
 };
 
 const getDeclarationValue = (decl) => {
-  const raws = decl.raws;
+	const raws = decl.raws;
 
-  return (raws.value && raws.value.raw) || decl.value;
+	return (raws.value && raws.value.raw) || decl.value;
 };
 
-const checkDeclHasFixColor = (nodes) => {
-  return (
-    nodes.some(
-      (node) => node.type === "function" && !ColorReg.test(node.value)
-    ) ||
-    (nodes.every((node) => node.type !== "function") &&
-      nodes.some((node) => checkColorIsValid(node.value)))
-  );
+const checkDeclHasFixColor = (nodes, originValue) => {
+	const funcNode = nodes.find((node) => node.type === 'function');
+
+	if (funcNode) {
+		return (
+			checkColorIsValid(originValue) ||
+			(!ColorReg.test(funcNode.value) && checkChildNodesColorIsValid(funcNode.nodes))
+		);
+	}
+
+	return checkChildNodesColorIsValid(nodes);
+};
+
+const checkChildNodesColorIsValid = (childNodes) => {
+	return childNodes.some((childNode) => checkColorIsValid(childNode.value));
+};
+
+const getFixedDeclValue = (nodes, originValue) => {
+	const existFuncNode = nodes.some((node) => node.type === 'function');
+
+	if (existFuncNode) {
+		if (checkColorIsValid(originValue)) {
+			return tinyColor(originValue).toRgbString();
+		}
+
+		return nodes
+			.filter((node) => ValidNodeType.has(node.type))
+			.map((node) => {
+				const { type = '', value = '', nodes = [] } = node;
+				if (type === 'function') {
+					return value + '(' + getFixedDeclValue(nodes, originValue) + ')';
+				}
+
+				return value;
+			})
+			.join('');
+	}
+
+	return nodes
+		.filter((node) => ValidNodeType.has(node.type))
+		.map((node) => {
+			const { value = '', type = '' } = node;
+			if (checkColorIsValid(value)) {
+				return tinyColor(value).toRgbString();
+			}
+
+			if (type === 'div') {
+				return `${value} `;
+			}
+
+			return value;
+		})
+		.join('');
 };
 
 const checkColorIsValid = (color) => {
-  return tinyColor(color).isValid() && !ColorReg.test(color);
-};
-
-const getFixedDeclValue = (nodes) => {
-  let originValue = "";
-  const isFunc = nodes.some((node) => node.type === "function");
-
-  if (isFunc) {
-    originValue = nodes
-      .filter((node) => node.type === "function" || node.type === "word")
-      .map((node) =>
-        node.type === "function"
-          ? node.value +
-            "(" +
-            node.nodes
-              .filter((i) => i.type === "word")
-              .map((childNode) => childNode.value) +
-            ")"
-          : node.value
-      )
-      .join(SplitStr);
-  } else {
-    originValue = nodes
-      .filter((i) => i.type === "word")
-      .map((node) => node.value)
-      .join("_&_");
-  }
-
-  const fixedValue = originValue
-    .split(SplitStr)
-    .map((i) => (checkColorIsValid(i) ? tinyColor(i).toRgbString() : i))
-    .join(" ");
-
-  return { originValue, fixedValue };
+	return tinyColor(color).isValid() && !ColorReg.test(color);
 };
 
 ruleFunction.ruleName = ruleName;

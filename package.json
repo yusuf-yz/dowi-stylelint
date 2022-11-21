@@ -1,6 +1,6 @@
 {
   "name": "dowi-stylelint",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "description": "A custom rules stylelint plugin.",
   "keywords": [
     "stylelint-plugin",
@@ -10,11 +10,14 @@
     "less",
     "lint"
   ],
-  "homepage": "github.com/18270219411/my-stylelint#readme",
-  "repository": "github.com/18270219411/my-stylelint",
+  "homepage": "github.com/18270219411/dowi-stylelint.git#readme",
+  "repository": "github.com/18270219411/dowi-stylelint.git",
   "license": "MIT",
   "author": "lunguizhang",
   "main": "src/index.js",
+  "files": [
+    "src/**/*.js"
+  ],
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "commit": "cz",
