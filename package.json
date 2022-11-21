@@ -1,6 +1,6 @@
 {
   "name": "dowi-stylelint",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "A custom rules stylelint plugin.",
   "keywords": [
     "stylelint-plugin",
@@ -24,7 +24,7 @@
     "prepare": "husky install",
     "format": "prettier ./src --write --cache",
     "version": "changeset version",
-    "publish": "changeset publish"
+    "publish": "changeset publish --no-git-checks"
   },
   "husky": {
     "hooks": {
@@ -43,6 +43,7 @@
     "root": true
   },
   "dependencies": {
+    "color": "^4.2.3",
     "import-lazy": "^4.0.0",
     "lodash": "^4.17.21",
     "postcss-value-parser": "^4.2.0",

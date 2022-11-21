@@ -2,19 +2,24 @@
 
 const { ruleMessages, validateOptions, report } = require('stylelint').utils;
 const { isString, isArray } = require('lodash');
-const tinyColor = require('tinycolor2');
-const valueParser = require('postcss-value-parser');
+const TinyColor = require('tinycolor2');
+const Color = require('color');
+const ValueParser = require('postcss-value-parser');
+const { resolve } = require('path');
+const { exec } = require('child_process');
 
 const ruleName = 'color-value-rgb';
 const messages = ruleMessages(ruleName, {
 	expected: (unfixed, fixed) => `Expected "${unfixed}" to be "${fixed}"`,
 });
 
-const ColorReg = /^(rgb)/;
+const RGBReg = /^(rgb)/;
+const HWBRgb = /^hwb/;
 // div -> split word. eg: ,
 // function -> function attr. eg: rgb, linear-gradient
 // word -> attr value. eg: #000
-const ValidNodeType = new Set(['div', 'function', 'word']);
+// space -> place string.
+const ValidNodeType = new Set(['div', 'function', 'word', 'space']);
 // TODO: Support attributes to be improved
 const LintAttrs = new Set(['background', 'border', 'box-shadow', 'color', 'text-shadow']);
 
@@ -56,18 +61,18 @@ const ruleFunction = (primary, secondaryOptions, context) => {
 			}
 
 			if ([...LintAttrs].some((attr) => prop.startsWith(attr))) {
-				const { nodes = [] } = valueParser(getDeclarationValue(decl));
+				const { nodes = [] } = ValueParser(getDeclarationValue(decl));
 
-				if (!checkDeclHasFixColor(nodes, value)) {
+				if (!checkDeclHasFixNode(nodes)) {
 					return;
 				}
 
-				const fixedValue = getFixedDeclValue(nodes, value);
-
-				// console.log('fixed value is ', fixedValue);
+				const fixedValue = getFixedDeclValue(nodes);
 
 				if (context.fix) {
-					return (decl.value = fixedValue);
+					decl.value = fixedValue;
+					exec(`prettier ${resolve(__dirname, decl.source.input.file)} --write --cache`);
+					return;
 				}
 
 				return report({
@@ -89,14 +94,29 @@ const getDeclarationValue = (decl) => {
 	return (raws.value && raws.value.raw) || decl.value;
 };
 
-const checkDeclHasFixColor = (nodes, originValue) => {
-	const funcNode = nodes.find((node) => node.type === 'function');
+const checkDeclHasFixNode = (nodes) => {
+	const funcNodes = nodes.filter((node) => node.type === 'function');
 
-	if (funcNode) {
-		return (
-			checkColorIsValid(originValue) ||
-			(!ColorReg.test(funcNode.value) && checkChildNodesColorIsValid(funcNode.nodes))
+	if (funcNodes.length > 0) {
+		const childFuncNode = funcNodes.find((funcNode) =>
+			funcNode.nodes.some((childFuncNode) => childFuncNode.type === 'function'),
 		);
+
+		if (childFuncNode) {
+			return checkDeclHasFixNode(childFuncNode.nodes);
+		}
+
+		return funcNodes.some((funcNode) => {
+			if (RGBReg.test(funcNode.value)) {
+				return false;
+			}
+
+			if (checkColorIsValid(getNodeOriginValue(funcNode))) {
+				return true;
+			}
+
+			return false;
+		});
 	}
 
 	return checkChildNodesColorIsValid(nodes);
@@ -106,37 +126,30 @@ const checkChildNodesColorIsValid = (childNodes) => {
 	return childNodes.some((childNode) => checkColorIsValid(childNode.value));
 };
 
-const getFixedDeclValue = (nodes, originValue) => {
-	const existFuncNode = nodes.some((node) => node.type === 'function');
-
-	if (existFuncNode) {
-		if (checkColorIsValid(originValue)) {
-			return tinyColor(originValue).toRgbString();
-		}
-
-		return nodes
-			.filter((node) => ValidNodeType.has(node.type))
-			.map((node) => {
-				const { type = '', value = '', nodes = [] } = node;
-				if (type === 'function') {
-					return value + '(' + getFixedDeclValue(nodes, originValue) + ')';
-				}
-
-				return value;
-			})
-			.join('');
-	}
-
+const getFixedDeclValue = (nodes) => {
 	return nodes
 		.filter((node) => ValidNodeType.has(node.type))
 		.map((node) => {
-			const { value = '', type = '' } = node;
-			if (checkColorIsValid(value)) {
-				return tinyColor(value).toRgbString();
+			const { type = '', value = '', nodes = [] } = node;
+
+			if (type === 'function') {
+				const childFuncNode = nodes.some((node) => node.type === 'function');
+
+				if (!childFuncNode) {
+					const originValue = getNodeOriginValue(node);
+
+					if (checkColorIsValid(originValue) || HWBRgb.test(originValue)) {
+						return transferRgbColor(originValue);
+					}
+
+					return originValue;
+				}
+
+				return value + '(' + getFixedDeclValue(nodes) + ')';
 			}
 
-			if (type === 'div') {
-				return `${value} `;
+			if (checkColorIsValid(value)) {
+				return transferRgbColor(value);
 			}
 
 			return value;
@@ -144,8 +157,29 @@ const getFixedDeclValue = (nodes, originValue) => {
 		.join('');
 };
 
+const getNodeOriginValue = (node) => {
+	const { value = '', nodes = [] } = node;
+	return (
+		value +
+		'(' +
+		nodes
+			.filter((node) => ValidNodeType.has(node.type))
+			.map((node) => node.value.replace(/\/|\s/g, ','))
+			.join('') +
+		')'
+	);
+};
+
 const checkColorIsValid = (color) => {
-	return tinyColor(color).isValid() && !ColorReg.test(color);
+	// 透明色不进行转换
+	if (color === 'transparent') {
+		return false;
+	}
+	return TinyColor(color).isValid() && !RGBReg.test(color);
+};
+
+const transferRgbColor = (color) => {
+	return Color(color).rgb().string();
 };
 
 ruleFunction.ruleName = ruleName;
