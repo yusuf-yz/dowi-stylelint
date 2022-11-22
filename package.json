@@ -1,6 +1,6 @@
 {
   "name": "dowi-stylelint",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "A custom rules stylelint plugin.",
   "keywords": [
     "stylelint-plugin",

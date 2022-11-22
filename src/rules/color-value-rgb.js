@@ -98,25 +98,20 @@ const checkDeclHasFixNode = (nodes) => {
 	const funcNodes = nodes.filter((node) => node.type === 'function');
 
 	if (funcNodes.length > 0) {
-		const childFuncNode = funcNodes.find((funcNode) =>
+		const childFuncNodes = funcNodes.filter((funcNode) =>
 			funcNode.nodes.some((childFuncNode) => childFuncNode.type === 'function'),
 		);
+		const existColorNode = funcNodes.some((node) => checkColorIsValid(getNodeOriginValue(node)));
 
-		if (childFuncNode) {
-			return checkDeclHasFixNode(childFuncNode.nodes);
+		if (existColorNode) {
+			return true;
 		}
 
-		return funcNodes.some((funcNode) => {
-			if (RGBReg.test(funcNode.value)) {
-				return false;
-			}
+		if (childFuncNodes.length > 0) {
+			return childFuncNodes.some((childFuncNode) => checkDeclHasFixNode(childFuncNode.nodes));
+		}
 
-			if (checkColorIsValid(getNodeOriginValue(funcNode))) {
-				return true;
-			}
-
-			return false;
-		});
+		return false;
 	}
 
 	return checkChildNodesColorIsValid(nodes);
@@ -178,6 +173,7 @@ const checkColorIsValid = (color) => {
 	return TinyColor(color).isValid() && !RGBReg.test(color);
 };
 
+// TODO: 部分颜色透明度目前存在超过 2 位小数的情况
 const transferRgbColor = (color) => {
 	return Color(color).rgb().string();
 };
