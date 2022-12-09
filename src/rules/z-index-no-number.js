@@ -1,8 +1,9 @@
 'use strict';
 
 const { ruleMessages, validateOptions, report } = require('stylelint').utils;
+const utils = require('../utils');
 
-const ruleName = 'z-index-no-number';
+const ruleName = (0, utils.namespace)('z-index-no-number');
 const messages = ruleMessages(ruleName, {
 	expected: (attr) => `Expected ${attr} not use number`,
 });

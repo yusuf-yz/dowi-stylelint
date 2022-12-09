@@ -7,8 +7,9 @@ const Color = require('color');
 const ValueParser = require('postcss-value-parser');
 const { resolve } = require('path');
 const { exec } = require('child_process');
+const utils = require('../utils');
 
-const ruleName = 'color-value-rgb';
+const ruleName = (0, utils.namespace)('color-value-rgb');
 const messages = ruleMessages(ruleName, {
 	expected: (unfixed, fixed) => `Expected "${unfixed}" to be "${fixed}"`,
 });

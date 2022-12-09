@@ -2,8 +2,8 @@
 
 const stylelint = require('stylelint');
 const rules = require('./rules');
-const namespace = require('../package.json').name;
+const utils = require('./utils');
 
 module.exports = Object.keys(rules).map((ruleName) =>
-	stylelint.createPlugin(`${namespace}/${ruleName}`, rules[ruleName]),
+	stylelint.createPlugin(`${(0, utils.namespace)(ruleName)}`, rules[ruleName]),
 );
